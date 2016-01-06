@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+
+<link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" />
+
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js"></script>
+
+<script type="text/javascript" src="http://cdn.robotwebtools.org/EventEmitter2/current/eventemitter2.min.js"></script>
+<script type="text/javascript" src="http://cdn.robotwebtools.org/roslibjs/current/roslib.min.js"></script>
+<script type="text/javascript" src="http://cdn.robotwebtools.org/keyboardteleopjs/current/keyboardteleop.min.js"></script>
+
+<script type="text/javascript">
+KEYBOARDTELEOP.Myop = function(options) {
+  var that = this;
+  options = options || {};
+  var ros = options.ros;
+  var topic = options.topic || '/cmd_vel';
+  // permanent throttle
+  var throttle = options.throttle || 1.0;
+
+  // used to externally throttle the speed (e.g., from a slider)
+  this.scale = 1.0;
+
+  // linear x and y movement and angular z movement
+  var x = 0;
+  var y = 0;
+  var z = 0;
+
+  var cmdVel = new ROSLIB.Topic({
+    ros : ros,
+    name : topic,
+    messageType : 'geometry_msgs/Twist'
+  });
+
+  // sets up a key listener on the page used for keyboard teleoperation
+  this.handleKey = function(keyCode, keyDown) {
+    // used to check for changes in speed
+    var oldX = x;
+    var oldY = y;
+    var oldZ = z;
+    
+    var pub = true;
+
+    var speed = 0;
+    // throttle the speed by the slider and throttle constant
+    if (keyDown === true) {
+      speed = throttle * that.scale;
+    }
+    // check which key was pressed
+    switch (keyCode) {
+      case 65:
+      case 37:
+        // turn left
+        z = 1 * speed;
+        break;
+      case 87:
+      case 38:
+        // up
+        x = 0.5 * speed;
+        break;
+      case 68:
+      case 39:
+        // turn right
+        z = -1 * speed;
+        break;
+      case 83:
+      case 40:
+        // down
+        x = -0.5 * speed;
+        break;
+      case 69:
+        // strafe right
+        y = -0.5 * speed;
+        break;
+      case 81:
+        // strafe left
+        y = 0.5 * speed;
+        break;
+      default:
+        pub = false;
+    }
+
+    // publish the command
+    if (pub === true) {
+      var twist = new ROSLIB.Message({
+        angular : {
+          x : 0,
+          y : 0,
+          z : z
+        },
+        linear : {
+          x : x,
+          y : y,
+          z : 0
+        }
+      });
+      cmdVel.publish(twist);
+    }
+  };
+}
+  /**
+   * Setup all GUI elements when the page is loaded.
+   */
+  function init() {
+    // Connecting to ROS.
+    var ros = new ROSLIB.Ros({
+      url : 'ws://10.10.10.1:9090'
+    });
+
+    // Initialize the teleop.
+    var teleop = new KEYBOARDTELEOP.Teleop({
+      ros : ros,
+      topic : '/turtle1/cmd_vel/'
+    });
+
+    var myop = new KEYBOARDTELEOP.Myop({
+      ros : ros,
+      topic : '/turtle1/cmd_vel/'
+    });
+
+    // Create a UI slider using JQuery UI.
+    $('#speed-slider').slider({
+      range : 'min',
+      min : 0,
+      max : 100,
+      value : 90,
+      slide : function(event, ui) {
+        // Change the speed label.
+        $('#speed-label').html('Speed: ' + ui.value + '%');
+        // Scale the speed.
+        teleop.scale = (ui.value / 100.0);
+      }
+    });
+	
+    var click = ('ontouchstart' in document.documentElement)  ? 'touchstart' : 'mousedown';
+
+    $('#forwardBtn').on(click,function () {
+       myop.handleKey(38,true);
+    });
+
+    $('#forwardBtn').mouseup(function () {
+       myop.handleKey(38,false);
+    });
+
+
+    $('#backBtn').on(click,function () {
+       myop.handleKey(40,true);
+    });
+
+    $('#backBtn').mouseup(function () {
+       myop.handleKey(40,false);
+    });
+
+
+    $('#leftBtn').on(click,function () {
+       myop.handleKey(65,true);
+    });
+
+    $('#leftBtn').mouseup(function () {
+       myop.handleKey(65,false);
+    });
+
+
+    $('#rightBtn').on(click,function () {
+       myop.handleKey(68,true);
+    });
+
+    $('#rightBtn').mouseup(function () {
+       myop.handleKey(68,false);
+    });
+
+    // Set the initial speed .
+    $('#speed-label').html('Speed: ' + ($('#speed-slider').slider('value')) + '%');
+    teleop.scale = ($('#speed-slider').slider('value') / 100.0);
+  }
+</script>
+
+<style>
+  html, body { padding: 0; margin: 0; }
+  html, .ui-mobile, .ui-mobile body {
+    height: 85px;
+  }
+  .ui-mobile, .ui-mobile .ui-page {
+    min-height: 85px;
+  }
+  div.box {
+    width: 3em;
+    height: 3em;
+    background-color: #108040;
+  }
+  div.box.taphold {
+    background-color: #7ACEF4;
+  }
+  </style>
+
+</head>
+
+<body onload="init()">
+  <div id="speed-label"></div>
+  <div id="speed-slider"></div>
+<!--  <div id="buttonsTop">
+    <button type="button" id="forwardBtn">Forward</button>
+  </div>
+
+  <div id="buttonsBot">
+    <button type="button" id="leftBtn">Turn Left</button>
+    <button type="button" id="backBtn">Back</button>
+    <button type="button" id="rightBtn">Turn Right</button>
+  </div>-->
+
+  <div class="box" id="leftBtn"></div>
+    <div class="box" id="backBtn"></div>
+  <div class="box" id="rightBtn"></div>
+  <div class="box" id="forwardBtn"></div>
+
+
+</body>
+</html>
